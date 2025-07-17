@@ -4,12 +4,16 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 import tensorflow as tf
-from tensorflow.keras.preprocessing import image
+from tensorflow.keras.utils import img_to_array
 import gdown
 import io
 import tempfile
 import requests
 import time
+
+# Suppress TensorFlow warnings
+tf.get_logger().setLevel('ERROR')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # ========== CONFIGURASI ==========
 st.set_page_config(
@@ -262,7 +266,7 @@ def main():
                 try:
                     # Preprocessing
                     img_resized = img.resize((224, 224))  # Sesuaikan dengan input model
-                    img_array = image.img_to_array(img_resized) / 255.0
+                    img_array = img_to_array(img_resized) / 255.0
                     img_array = np.expand_dims(img_array, axis=0)
                     
                     # Prediksi

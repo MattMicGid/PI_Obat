@@ -23,8 +23,12 @@ st.set_page_config(
 def load_model_local():
     model_path = "model_obat_1.h5"
     try:
-        model = tf.keras.models.load_model(model_path)
-        return model
+        if os.path.exists(model_path):
+            model = tf.keras.models.load_model(model_path)
+            return model
+        else:
+            st.error(f"File model tidak ditemukan: {model_path}")
+            return None
     except Exception as e:
         st.error(f"Gagal memuat model: {str(e)}")
         return None
@@ -32,15 +36,17 @@ def load_model_local():
 # ================== LOAD CSV ================== #
 @st.cache_data
 def load_dataset_local():
+    dataset_path = "dataset_obat.csv"
     try:
-        df = pd.read_csv("dataset_obat.csv")
-        return df
+        if os.path.exists(dataset_path):
+            df = pd.read_csv(dataset_path)
+            return df
+        else:
+            st.error(f"File dataset tidak ditemukan: {dataset_path}")
+            return None
     except Exception as e:
         st.error(f"Gagal memuat dataset: {str(e)}")
         return None
-
-model = load_model_local()
-obat_info_df = load_dataset_local()
 
 # ========== FUNGSI TTS ==========
 def speak_text(text, lang='id'):
@@ -102,9 +108,9 @@ def main():
     st.title("💊 ObatVision: Deteksi dan Info Obat")
     st.markdown("---")
     
-    # Download model dan dataset
-    model = download_model()
-    obat_info_df = download_dataset()
+    # Load model dan dataset
+    model = load_model_local()
+    obat_info_df = load_dataset_local()
     
     if model is None or obat_info_df is None:
         st.error("Gagal memuat model atau database. Silakan refresh halaman.")

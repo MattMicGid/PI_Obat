@@ -1,282 +1,331 @@
+import os
+import numpy as np
+import pandas as pd
 import streamlit as st
 from PIL import Image
-import os
-import sounddevice as sd
-import numpy as np
-import scipy.io.wavfile
-import speech_recognition as sr
-import pyttsx3
-import cv2
-import mediapipe as mp
+import gdown
+import tempfile
+import base64
+from gtts import gTTS
 import tensorflow as tf
-import threading
+from tensorflow.keras.preprocessing import image
+from streamlit_extras.stylable_container import stylable_container
+import time
 
-# Page config
-st.set_page_config(page_title="AI SignLang Tutor", layout="centered")
-st.markdown("<h1 style='text-align: center;'>🧏 AI SignLang Tutor</h1>", unsafe_allow_html=True)
+# ========== KONFIGURASI ==========
+st.set_page_config(
+    page_title="ObatVision", 
+    layout="centered",
+    page_icon="💊"
+)
 
-# Banner Image
-if os.path.exists("image.jpg"):
-    st.image("image.jpg", use_container_width=True)
-
-# Motivational Quote
-st.markdown("""
-<p style='font-size:20px; text-align:center; font-weight:bold;'>
-💪 Physical disabilities are not barriers 🚫 to success 🌟<br>
-They're just different paths to greatness ✨🚀
-</p>
-<hr style='border:none; height:2px; background:#ccc;'>
-""", unsafe_allow_html=True)
-
-# Extra space before tabs
-st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
-
-# 💅 Tab Styling
-st.markdown("""
-<style>
-div[data-baseweb="tab-list"] button {
-    font-size: 18px !important;
-    margin-right: 25px !important;
-    padding: 10px 20px !important;
-    border-radius: 8px;
-    background-color: #f5f5f5;
-    transition: all 0.3s ease;
+# Konfigurasi Google Drive
+GOOGLE_DRIVE_CONFIG = {
+    "model_file_id": "1WEALsJVVZjTedzapj0ykmzVg3wf4-Yub", 
+    "dataset_file_id": "1V-HI64YbBUQmkd20IOqMzAEk88PlqECw", 
+    "model_filename": "modal_obat_1.h5",
+    "dataset_filename": "dataset_obat.csv"
 }
-div[data-baseweb="tab-list"] button[aria-selected="true"] {
-    font-weight: bold;
-    background-color: #d0ebff !important;
-    color: #004080 !important;
-}
-div[data-baseweb="tab-list"] button:hover {
-    background-color: #e6f4ff;
-}
-</style>
-""", unsafe_allow_html=True)
 
-# --- Voice Output ---
-def speak_text(text):
+# ========== FUNGSI DOWNLOAD ==========
+@st.cache_resource
+def download_model():
+    """Download model dari Google Drive"""
+    model_path = GOOGLE_DRIVE_CONFIG["model_filename"]
+    
+    if not os.path.exists(model_path):
+        with st.spinner("Mengunduh model AI... Mohon tunggu sebentar."):
+            try:
+                url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_CONFIG['model_file_id']}"
+                gdown.download(url, model_path, quiet=False)
+                st.success("Model berhasil diunduh!")
+            except Exception as e:
+                st.error(f"Gagal mengunduh model: {str(e)}")
+                return None
+    
+    # Load model
     try:
-        engine = pyttsx3.init()
-        engine.setProperty('rate', 150)
-        engine.setProperty('volume', 1.0)
-        engine.say(text)
-        engine.runAndWait()
-    except RuntimeError:
-        st.warning("⚠️ Voice output engine is already active. Try again after refresh.")
+        model = tf.keras.models.load_model(model_path)
+        return model
+    except Exception as e:
+        st.error(f"Gagal memuat model: {str(e)}")
+        return None
 
-# --- Helpers ---
-def record_audio(duration=5, fs=44100):
-    st.info("🎙️ Listening... Speak now!")
-    audio = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
-    sd.wait()
-    return audio, fs
+@st.cache_data
+def download_dataset():
+    """Download dataset dari Google Drive"""
+    dataset_path = GOOGLE_DRIVE_CONFIG["dataset_filename"]
+    
+    if not os.path.exists(dataset_path):
+        with st.spinner("Mengunduh database obat..."):
+            try:
+                url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_CONFIG['dataset_file_id']}"
+                gdown.download(url, dataset_path, quiet=False)
+                st.success("Database berhasil diunduh!")
+            except Exception as e:
+                st.error(f"Gagal mengunduh database: {str(e)}")
+                return None
+    
+    # Load dataset
+    try:
+        df = pd.read_csv(dataset_path)
+        return df
+    except Exception as e:
+        st.error(f"Gagal memuat database: {str(e)}")
+        return None
 
-def save_wav(filename, audio, fs):
-    scipy.io.wavfile.write(filename, fs, audio)
+# ========== FUNGSI TTS ==========
+def speak_text(text, lang='id'):
+    """Konversi teks ke audio menggunakan gTTS"""
+    try:
+        # Buat temporary file untuk audio
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp_file:
+            tts = gTTS(text=text, lang=lang, slow=False)
+            tts.save(tmp_file.name)
+            
+            # Baca file audio dan encode ke base64
+            with open(tmp_file.name, 'rb') as audio_file:
+                audio_bytes = audio_file.read()
+            
+            # Hapus temporary file
+            os.unlink(tmp_file.name)
+            
+            # Encode ke base64 untuk HTML audio player
+            audio_base64 = base64.b64encode(audio_bytes).decode()
+            
+            # Tampilkan audio player
+            audio_html = f"""
+            <audio autoplay>
+                <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+                Your browser does not support the audio element.
+            </audio>
+            """
+            st.markdown(audio_html, unsafe_allow_html=True)
+            
+    except Exception as e:
+        st.error(f"Gagal memutar audio: {str(e)}")
 
-def transcribe_audio(filename):
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(filename) as source:
-        audio_data = recognizer.record(source)
-        try:
-            return recognizer.recognize_google(audio_data)
-        except sr.UnknownValueError:
-            return "❌ Could not understand audio."
-        except sr.RequestError as e:
-            return f"❗ API error: {e}"
+def create_audio_player(text, lang='id'):
+    """Buat audio player untuk teks"""
+    try:
+        tts = gTTS(text=text, lang=lang, slow=False)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp_file:
+            tts.save(tmp_file.name)
+            
+            with open(tmp_file.name, 'rb') as audio_file:
+                audio_bytes = audio_file.read()
+            
+            os.unlink(tmp_file.name)
+            
+            audio_base64 = base64.b64encode(audio_bytes).decode()
+            
+            return f"""
+            <audio controls style="width: 100%;">
+                <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+                Your browser does not support the audio element.
+            </audio>
+            """
+    except Exception as e:
+        return f"<p>Error creating audio: {str(e)}</p>"
 
-def get_keywords(sentence):
-    return sentence.lower().split()
+# ========== MAIN APP ==========
+def main():
+    # Header
+    st.title("💊 ObatVision: Deteksi dan Info Obat")
+    st.markdown("---")
+    
+    # Download model dan dataset
+    model = download_model()
+    obat_info_df = download_dataset()
+    
+    if model is None or obat_info_df is None:
+        st.error("Gagal memuat model atau database. Silakan refresh halaman.")
+        return
+    
+    # Dapatkan class names
+    class_names = sorted(obat_info_df['label'].unique())
+    
+    # ========== SIDEBAR INPUT ==========
+    with st.sidebar:
+        st.header("📷 Input Gambar")
+        st.markdown("Pilih salah satu cara untuk memasukkan gambar obat:")
+        
+        # Upload file
+        img_file = st.file_uploader(
+            "📁 Unggah Gambar Obat", 
+            type=["jpg", "jpeg", "png"],
+            help="Format yang didukung: JPG, JPEG, PNG"
+        )
+        
+        st.markdown("**ATAU**")
+        
+        # Camera input
+        camera_img = st.camera_input(
+            "📸 Ambil Gambar Realtime",
+            help="Klik untuk mengambil foto obat secara langsung"
+        )
+        
+        # Pilih input yang akan digunakan
+        img_input = img_file if img_file else camera_img
+        
+        if img_input:
+            st.success("✅ Gambar berhasil dimuat!")
+    
+    # ========== MAIN CONTENT ==========
+    if img_input:
+        # Proses gambar
+        with st.spinner("🔍 Menganalisis gambar obat..."):
+            try:
+                # Load dan resize gambar
+                img = Image.open(img_input).convert('RGB')
+                img_resized = img.resize((256, 256))
+                
+                # Preprocessing untuk model
+                img_array = image.img_to_array(img_resized) / 255.0
+                img_array = np.expand_dims(img_array, axis=0)
+                
+                # Prediksi
+                prediction = model.predict(img_array)[0]
+                predicted_index = np.argmax(prediction)
+                predicted_label = class_names[predicted_index]
+                confidence = prediction[predicted_index] * 100
+                
+                # Ambil info dari CSV
+                info = obat_info_df[obat_info_df['label'] == predicted_label].iloc[0]
+                
+            except Exception as e:
+                st.error(f"Gagal memproses gambar: {str(e)}")
+                return
+        
+        # ========== HASIL PREDIKSI ==========
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.image(
+                img, 
+                caption=f"Hasil Deteksi: {predicted_label}", 
+                use_column_width=True
+            )
+        
+        with col2:
+            st.subheader(f"💊 {info['nama_obat']}")
+            st.metric("🎯 Akurasi Prediksi", f"{confidence:.2f}%")
+            
+            # Info dasar
+            st.markdown(f"""
+            **Golongan:** {info['golongan']}  
+            **Jenis:** {info['jenis']}  
+            """)
+        
+        # ========== INFO LENGKAP ==========
+        st.markdown("---")
+        st.subheader("📋 Informasi Lengkap Obat")
+        
+        with st.expander("🔍 Lihat Detail", expanded=True):
+            st.markdown(f"""
+            **Manfaat:** {info['manfaat']}  
+            **Aturan Minum:** {info['aturan_minum']}  
+            **Catatan:** {info['catatan']}  
+            """)
+        
+        # ========== PERINGATAN ==========
+        st.warning("""
+        ⚠️ **PERINGATAN PENTING:** 
+        Aturan minum dapat berbeda-beda pada setiap orang. Harus mengikuti saran dari dokter yang sudah cek kondisi pasien. 
+        Kira-kira solusinya mungkin bisa menambahkan fitur untuk koreksi jadwal minum obat, jika memungkinkan.
+        """)
+        
+        # Text untuk TTS
+        main_text = f"""
+        Obat yang terdeteksi adalah {info['nama_obat']}. 
+        Aturan minum: {info['aturan_minum']}. 
+        Perhatian: {info['catatan']}. 
+        Peringatan: Aturan minum dapat berbeda-beda pada setiap orang, harus mengikuti saran dari dokter yang sudah cek kondisi pasien.
+        """
+        
+        # Auto play audio
+        speak_text(main_text)
+        
+        # ========== MENU LANJUTAN ==========
+        st.markdown("---")
+        st.subheader("📂 Lihat lebih lanjut:")
+        
+        with stylable_container("popup-menu", css="""
+            button {
+                background-color: #f8f9fa;
+                border: 2px solid #e9ecef;
+                border-radius: 8px;
+                padding: 0.5rem 1rem;
+                margin: 0.3rem;
+                transition: all 0.3s ease;
+                font-weight: 500;
+            }
+            button:hover {
+                background-color: #e9ecef;
+                border-color: #007bff;
+                transform: translateY(-2px);
+            }
+        """):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🔴 Efek Samping", key="efek_samping"):
+                    efek_samping = info.get('efek_samping', 'Informasi tidak tersedia')
+                    st.info(f"**Efek Samping {info['nama_obat']}:**\n{efek_samping}")
+                    audio_html = create_audio_player(f"Efek samping dari {info['nama_obat']}: {efek_samping}")
+                    st.markdown(audio_html, unsafe_allow_html=True)
+                
+                if st.button("🚫 Pantangan Makanan", key="pantangan"):
+                    pantangan = info.get('pantangan_makanan', 'Informasi tidak tersedia')
+                    st.info(f"**Pantangan Makanan:**\n{pantangan}")
+                    audio_html = create_audio_player(f"Pantangan makanan: {pantangan}")
+                    st.markdown(audio_html, unsafe_allow_html=True)
+                
+                if st.button("⚠️ Interaksi Negatif", key="interaksi"):
+                    interaksi = info.get('interaksi_negatif', 'Informasi tidak tersedia')
+                    st.info(f"**Interaksi Negatif:**\n{interaksi}")
+                    audio_html = create_audio_player(f"Interaksi negatif: {interaksi}")
+                    st.markdown(audio_html, unsafe_allow_html=True)
+            
+            with col2:
+                if st.button("🤔 Jika Lupa Minum?", key="lupa_minum"):
+                    lupa_minum = info.get('jika_lupa_minum', 'Informasi tidak tersedia')
+                    st.info(f"**Jika Lupa Minum:**\n{lupa_minum}")
+                    audio_html = create_audio_player(f"Jika lupa minum: {lupa_minum}")
+                    st.markdown(audio_html, unsafe_allow_html=True)
+                
+                if st.button("📦 Cara Penyimpanan", key="penyimpanan"):
+                    penyimpanan = info.get('penyimpanan', 'Informasi tidak tersedia')
+                    st.info(f"**Cara Penyimpanan:**\n{penyimpanan}")
+                    audio_html = create_audio_player(f"Cara penyimpanan: {penyimpanan}")
+                    st.markdown(audio_html, unsafe_allow_html=True)
+    
+    else:
+        # ========== TAMPILAN AWAL ==========
+        st.markdown("""
+        <div style="text-align: center; padding: 2rem;">
+            <h2>🔍 Selamat datang di ObatVision!</h2>
+            <p>Aplikasi deteksi obat menggunakan AI untuk membantu Anda mengenali obat dan mendapatkan informasi lengkap tentang penggunaan yang tepat.</p>
+            <p><strong>Silakan unggah gambar obat atau ambil foto menggunakan kamera di sidebar.</strong></p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Panduan penggunaan
+        with st.expander("📖 Panduan Penggunaan", expanded=True):
+            st.markdown("""
+            **Langkah-langkah:**
+            1. **Upload Gambar** - Klik "Unggah Gambar Obat" dan pilih file gambar
+            2. **Atau Ambil Foto** - Klik "Ambil Gambar Realtime" untuk foto langsung
+            3. **Tunggu Analisis** - AI akan menganalisis gambar obat Anda
+            4. **Lihat Hasil** - Dapatkan informasi lengkap tentang obat
+            5. **Dengarkan Audio** - Informasi akan dibacakan secara otomatis
+            6. **Jelajahi Detail** - Klik menu untuk info lebih lanjut
+            
+            **Tips:**
+            - Pastikan gambar obat jelas dan fokus
+            - Pencahayaan yang baik akan meningkatkan akurasi
+            - Obat sebaiknya dalam kemasan asli
+            """)
 
-def ask_amazon_q(prompt):
-    prompt = prompt.lower().strip()
-    q_responses = {
-    # Alphabets (sample A–E)
-    "how to sign A": "Fist with thumb on the side.",
-    "how to sign B": "Palm out, fingers together, thumb across palm.",
-    "how to sign C": "Make a C-shape with hand.",
-    "how to sign D": "Index finger up, touch thumb and middle.",
-    "how to sign E": "Fingertips touch thumb, palm forward.",
-
-    # Greetings & Emotions
-    "how to sign hello": "Salute starting from the forehead.",
-    "how to sign thank you": "Fingers at chin moving forward.",
-    "how to sign sorry": "Rub fist over chest in circular motion.",
-    "how to sign please": "Flat hand on chest, move in circular motion.",
-    "how to sign good morning": "Hand at chin moves forward then sun rising motion.",
-    "how to sign good night": "Palm forward, then hands fold like sleeping.",
-    "how to sign welcome": "Both hands move inward toward the chest.",
-    "how to sign bye": "Wave your hand as you would naturally.",
-    "how to sign happy": "Flat hands circle up from chest outward with smile.",
-    "how to sign sad": "Open hands move down past the face.",
-    "how to sign angry": "Claw hands pull down from face.",
-    "how to sign love": "Cross both fists over chest.",
-    "how to sign I love you": "Thumb, index, pinky finger up — middle and ring folded.",
-
-    # Family
-    "how to sign father": "Thumb on forehead with spread fingers.",
-    "how to sign mother": "Thumb on chin with spread fingers.",
-    "how to sign brother": "Make fists and tap one over the other twice.",
-    "how to sign sister": "Make 'L' shape with both hands and tap at the chin.",
-    "how to sign friend": "Hook index fingers together in both directions.",
-    "how to sign baby": "Pretend to rock a baby in arms.",
-    "how to sign uncle": "Twist 'U' hand near forehead.",
-    "how to sign aunt": "Twist 'A' hand near chin.",
-
-    # Colors
-    "how to sign red": "Brush index finger down lips.",
-    "how to sign blue": "Shake 'B' hand near shoulder.",
-    "how to sign green": "Shake 'G' hand near shoulder.",
-    "how to sign yellow": "Shake 'Y' hand near shoulder.",
-    "how to sign black": "Index finger draws across forehead.",
-    "how to sign white": "Pull flat hand away from chest like grabbing shirt.",
-    "how to sign pink": "Middle finger brushes down chin.",
-    "how to sign orange": "Squeeze fist in front of mouth (like juicing).",
-
-    # Numbers
-    "how to sign zero": "Make an 'O' with fingers.",
-    "how to sign one": "Index finger up.",
-    "how to sign two": "Index and middle finger up.",
-    "how to sign three": "Thumb, index, middle finger up.",
-    "how to sign four": "All except thumb up.",
-    "how to sign five": "All fingers spread.",
-    "how to sign six": "Thumb touches pinky.",
-    "how to sign seven": "Thumb touches ring finger.",
-    "how to sign eight": "Thumb touches middle finger.",
-    "how to sign nine": "Thumb touches index finger.",
-
-    # Functional / Common
-    "how to sign yes": "Fist nods like a head.",
-    "how to sign no": "Index and middle finger tap thumb (like saying 'no').",
-    "how to sign help": "Thumbs up on palm, raise both hands.",
-    "how to sign school": "Clap hands horizontally once.",
-    "how to sign book": "Palms together, then open like a book.",
-    "how to sign work": "Make fists and tap wrist together.",
-    "how to sign eat": "Fingers tap mouth.",
-    "how to sign drink": "Thumb to mouth as if holding a cup.",
-    "how to sign water": "Tap 'W' shape at chin.",
-    "how to sign bathroom": "Shake 'T' sign (thumb between fingers)."
-}
-
-    for key in q_responses:
-        if key in prompt:
-            return q_responses[key]
-    return "🤖 Amazon Q: I'm still learning that sign! Try asking about greetings, family members, or colors."
-
-# --- Tabs ---
-tab1, tab2, tab3 = st.tabs([
-    "📥  Text/Voice ➡️ Sign Video",
-    "🤖  Ask AI Tutor (with Voice)",
-    "🖐️  Sign ➡️ Text + Voice"
-])
-
-# --- TAB 1 ---
-with tab1:
-    st.markdown("<h2 style='color:#004080;'>📥 Translate Text or Voice to Sign Language</h2>", unsafe_allow_html=True)
-
-    input_type = st.radio("Choose Input Type", ["Text", "Microphone"])
-    user_input = ""
-
-    if input_type == "Text":
-        user_input = st.text_input("Type your sentence:")
-
-    elif input_type == "Microphone":
-        duration = st.slider("🎤 Recording Duration (sec)", 2, 10, 5)
-        if st.button("🔴 Start Recording"):
-            audio, fs = record_audio(duration)
-            save_wav("input_audio.wav", audio, fs)
-            result = transcribe_audio("input_audio.wav")
-            st.session_state["captured_speech"] = result
-        st.text_input("🗣️ Recognized Speech", value=st.session_state.get("captured_speech", ""), key="speech_display")
-        user_input = st.session_state.get("captured_speech", "")
-
-    if st.button("▶️ Translate") and user_input:
-        keywords = get_keywords(user_input)
-        video_path = f"videos/{keywords[0]}.mp4"
-        if os.path.exists(video_path):
-            st.video(video_path)
-        else:
-            st.error("❌ No video found for this keyword.")
-
-# --- TAB 2 ---
-with tab2:
-    st.markdown("<h2 style='color:#004080;'>🤖 Ask the AI Tutor</h2>", unsafe_allow_html=True)
-
-    ask_type = st.radio("Input for AI Tutor", ["Text", "Microphone"], key="ask_input_type")
-    if "ai_query" not in st.session_state:
-        st.session_state["ai_query"] = ""
-
-    if ask_type == "Text":
-        st.session_state["ai_query"] = st.text_input("Ask something like 'How to sign father'", key="ai_query_text")
-
-    elif ask_type == "Microphone":
-        duration = st.slider("🎧 Ask Duration", 2, 10, 5)
-        if st.button("🎙️ Record Question"):
-            audio, fs = record_audio(duration)
-            save_wav("ask_audio.wav", audio, fs)
-            query = transcribe_audio("ask_audio.wav")
-            st.session_state["ai_query"] = query
-        st.text_input("🗣️ Recognized AI Query", value=st.session_state["ai_query"], key="ai_query_display")
-
-    if st.button("🔍 Ask AI") and st.session_state["ai_query"]:
-        answer = ask_amazon_q(st.session_state["ai_query"])
-        st.success(answer)
-        threading.Thread(target=speak_text, args=(answer,)).start()
-
-# --- TAB 3 ---
-with tab3:
-    st.markdown("<h2 style='color:#004080;'>🖐️ Recognize Sign Gestures via Webcam</h2>", unsafe_allow_html=True)
-    st.markdown("This will open a webcam window. Press 'q' to quit.")
-
-    if st.button("📸 Start Gesture Recognition"):
-        try:
-            model = tf.keras.models.load_model("sign_model.h5")
-            labels = np.load("label_classes.npy")
-        except Exception as e:
-            st.error(f"❌ Failed to load model: {e}")
-            st.stop()
-
-        mp_hands = mp.solutions.hands
-        mp_drawing = mp.solutions.drawing_utils
-        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-
-        if not cap.isOpened():
-            st.error("❌ Could not open webcam.")
-            st.stop()
-
-        phrase = ""
-
-        with mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7) as hands:
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                result = hands.process(frame_rgb)
-
-                if result.multi_hand_landmarks:
-                    for hand_landmarks in result.multi_hand_landmarks:
-                        mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-                        coords = []
-                        for lm in hand_landmarks.landmark:
-                            coords.extend([lm.x, lm.y, lm.z])
-                        if len(coords) == 63:
-                            prediction = model.predict(np.array([coords]))[0]
-                            label = labels[np.argmax(prediction)]
-                            confidence = np.max(prediction)
-                            if confidence > 0.6:
-                                phrase = label.replace("_", " ")
-                                cv2.putText(frame, phrase, (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
-                                threading.Thread(target=speak_text, args=(phrase,)).start()
-
-                cv2.imshow("Sign Gesture Recognition", frame)
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
-
-        cap.release()
-        cv2.destroyAllWindows()
-        if phrase:
-            st.success(f"✅ Last recognized phrase: {phrase}")
-        else:
-            st.warning("⚠️ No phrase confidently recognized. Try again with better lighting or gesture.")
+if __name__ == "__main__":
+    main()

@@ -133,11 +133,22 @@ def main():
         
         st.markdown("**ATAU**")
         
-        # Camera input
-        camera_img = st.camera_input(
-            "📸 Ambil Gambar Realtime",
-            help="Klik untuk mengambil foto obat secara langsung"
+        # Toggle untuk mengaktifkan kamera
+        enable_camera = st.toggle(
+            "🔧 Aktifkan Kamera",
+            value=False,
+            help="Aktifkan toggle ini untuk menggunakan kamera"
         )
+        
+        # Camera input (hanya muncul jika toggle diaktifkan)
+        camera_img = None
+        if enable_camera:
+            camera_img = st.camera_input(
+                "📸 Ambil Gambar Realtime",
+                help="Klik untuk mengambil foto obat secara langsung"
+            )
+        else:
+            st.info("💡 Aktifkan toggle di atas untuk menggunakan kamera")
         
         # Pilih input yang akan digunakan
         img_input = img_file if img_file else camera_img

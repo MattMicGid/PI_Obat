@@ -1,11 +1,21 @@
 import streamlit as st
 import tensorflow as tf
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, decode_predictions
-from tensorflow.keras.preprocessing import image
 import numpy as np
 from PIL import Image
 import io
+import warnings
+
+# Suppress warnings
+warnings.filterwarnings('ignore')
+
+# Import dengan error handling
+try:
+    from tensorflow.keras.applications import MobileNetV2
+    from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, decode_predictions
+    from tensorflow.keras.preprocessing import image
+except ImportError as e:
+    st.error(f"Error importing TensorFlow components: {e}")
+    st.stop()
 
 # Konfigurasi halaman
 st.set_page_config(

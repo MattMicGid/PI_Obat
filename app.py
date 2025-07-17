@@ -8,7 +8,7 @@ import base64
 from gtts import gTTS
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
-from streamlit_extras.stylable_container import stylable_container
+# from streamlit_extras.stylable_container import stylable_container
 import time
 
 # ========== KONFIGURASI ==========
@@ -224,55 +224,60 @@ def main():
         st.markdown("---")
         st.subheader("📂 Lihat lebih lanjut:")
         
-        with stylable_container("popup-menu", css="""
-            button {
-                background-color: #f8f9fa;
-                border: 2px solid #e9ecef;
-                border-radius: 8px;
-                padding: 0.5rem 1rem;
-                margin: 0.3rem;
-                transition: all 0.3s ease;
-                font-weight: 500;
-            }
-            button:hover {
-                background-color: #e9ecef;
-                border-color: #007bff;
-                transform: translateY(-2px);
-            }
-        """):
-            col1, col2 = st.columns(2)
+        # Custom CSS for buttons
+        st.markdown("""
+        <style>
+        .stButton > button {
+            background-color: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            margin: 0.3rem 0;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            width: 100%;
+        }
+        .stButton > button:hover {
+            background-color: #e9ecef;
+            border-color: #007bff;
+            transform: translateY(-2px);
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🔴 Efek Samping", key="efek_samping"):
+                efek_samping = info.get('efek_samping', 'Informasi tidak tersedia')
+                st.info(f"**Efek Samping {info['nama_obat']}:**\n{efek_samping}")
+                audio_html = create_audio_player(f"Efek samping dari {info['nama_obat']}: {efek_samping}")
+                st.markdown(audio_html, unsafe_allow_html=True)
             
-            with col1:
-                if st.button("🔴 Efek Samping", key="efek_samping"):
-                    efek_samping = info.get('efek_samping', 'Informasi tidak tersedia')
-                    st.info(f"**Efek Samping {info['nama_obat']}:**\n{efek_samping}")
-                    audio_html = create_audio_player(f"Efek samping dari {info['nama_obat']}: {efek_samping}")
-                    st.markdown(audio_html, unsafe_allow_html=True)
-                
-                if st.button("🚫 Pantangan Makanan", key="pantangan"):
-                    pantangan = info.get('pantangan_makanan', 'Informasi tidak tersedia')
-                    st.info(f"**Pantangan Makanan:**\n{pantangan}")
-                    audio_html = create_audio_player(f"Pantangan makanan: {pantangan}")
-                    st.markdown(audio_html, unsafe_allow_html=True)
-                
-                if st.button("⚠️ Interaksi Negatif", key="interaksi"):
-                    interaksi = info.get('interaksi_negatif', 'Informasi tidak tersedia')
-                    st.info(f"**Interaksi Negatif:**\n{interaksi}")
-                    audio_html = create_audio_player(f"Interaksi negatif: {interaksi}")
-                    st.markdown(audio_html, unsafe_allow_html=True)
+            if st.button("🚫 Pantangan Makanan", key="pantangan"):
+                pantangan = info.get('pantangan_makanan', 'Informasi tidak tersedia')
+                st.info(f"**Pantangan Makanan:**\n{pantangan}")
+                audio_html = create_audio_player(f"Pantangan makanan: {pantangan}")
+                st.markdown(audio_html, unsafe_allow_html=True)
             
-            with col2:
-                if st.button("🤔 Jika Lupa Minum?", key="lupa_minum"):
-                    lupa_minum = info.get('jika_lupa_minum', 'Informasi tidak tersedia')
-                    st.info(f"**Jika Lupa Minum:**\n{lupa_minum}")
-                    audio_html = create_audio_player(f"Jika lupa minum: {lupa_minum}")
-                    st.markdown(audio_html, unsafe_allow_html=True)
-                
-                if st.button("📦 Cara Penyimpanan", key="penyimpanan"):
-                    penyimpanan = info.get('penyimpanan', 'Informasi tidak tersedia')
-                    st.info(f"**Cara Penyimpanan:**\n{penyimpanan}")
-                    audio_html = create_audio_player(f"Cara penyimpanan: {penyimpanan}")
-                    st.markdown(audio_html, unsafe_allow_html=True)
+            if st.button("⚠️ Interaksi Negatif", key="interaksi"):
+                interaksi = info.get('interaksi_negatif', 'Informasi tidak tersedia')
+                st.info(f"**Interaksi Negatif:**\n{interaksi}")
+                audio_html = create_audio_player(f"Interaksi negatif: {interaksi}")
+                st.markdown(audio_html, unsafe_allow_html=True)
+        
+        with col2:
+            if st.button("🤔 Jika Lupa Minum?", key="lupa_minum"):
+                lupa_minum = info.get('jika_lupa_minum', 'Informasi tidak tersedia')
+                st.info(f"**Jika Lupa Minum:**\n{lupa_minum}")
+                audio_html = create_audio_player(f"Jika lupa minum: {lupa_minum}")
+                st.markdown(audio_html, unsafe_allow_html=True)
+            
+            if st.button("📦 Cara Penyimpanan", key="penyimpanan"):
+                penyimpanan = info.get('penyimpanan', 'Informasi tidak tersedia')
+                st.info(f"**Cara Penyimpanan:**\n{penyimpanan}")
+                audio_html = create_audio_player(f"Cara penyimpanan: {penyimpanan}")
+                st.markdown(audio_html, unsafe_allow_html=True)
     
     else:
         # ========== TAMPILAN AWAL ==========

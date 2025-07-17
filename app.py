@@ -5,7 +5,6 @@ import streamlit as st
 from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
-from streamlit_extras.stylable_container import stylable_container
 import requests
 
 # ========== CONFIGURASI ========== #
@@ -30,32 +29,30 @@ def download_from_gdrive(file_id, destination):
             token = value
             break
     if token:
-        params = {'id': file_id, 'confirm': token}
-        response = session.get(URL, params=params, stream=True)
+        response = session.get(URL, params={'id': file_id, 'confirm': token}, stream=True)
     with open(destination, "wb") as f:
         for chunk in response.iter_content(32768):
             if chunk:
                 f.write(chunk)
 
-@st.cache_resource(show_spinner=True)
+@st.cache_resource
 def load_model():
     model_path = GOOGLE_DRIVE_CONFIG['model_filename']
     if not os.path.exists(model_path):
-        st.info("Mengunduh model dari Google Drive...")
+        st.info("Downloading model from Google Drive...")
         download_from_gdrive(GOOGLE_DRIVE_CONFIG['model_file_id'], model_path)
     model = tf.keras.models.load_model(model_path)
     return model
 
-@st.cache_data(show_spinner=True)
+@st.cache_data
 def load_data():
     dataset_path = GOOGLE_DRIVE_CONFIG['dataset_filename']
     if not os.path.exists(dataset_path):
-        st.info("Mengunduh data obat dari Google Drive...")
+        st.info("Downloading dataset from Google Drive...")
         download_from_gdrive(GOOGLE_DRIVE_CONFIG['dataset_file_id'], dataset_path)
     df = pd.read_csv(dataset_path)
     return df
 
-# Muat model dan data
 model = load_model()
 obat_info_df = load_data()
 class_names = sorted(obat_info_df['label'].unique())
@@ -92,9 +89,8 @@ if img_input:
     *Aturan Minum:* {info['aturan_minum']}  
     *Catatan:* {info['catatan']}  
 
-    *🎯 Akurasi Prediksi:* {confidence:.2f}%
+    *🎯 Akurasi Prediksi:* {confidence:.2f}%  
     """)
-
     st.warning("⚠ Aturan minum dapat berbeda-beda pada setiap orang. Ikuti saran dokter yang memahami kondisi Anda.")
 else:
     st.info("Silakan unggah gambar obat atau ambil foto menggunakan kamera.")

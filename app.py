@@ -3,17 +3,25 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from PIL import Image
-import tensorflow as tf
-from tensorflow.keras.utils import img_to_array
 import gdown
 import io
 import tempfile
-import requests
 import time
 
-# Suppress TensorFlow warnings
-tf.get_logger().setLevel('ERROR')
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# Suppress warnings
+import warnings
+warnings.filterwarnings('ignore')
+
+# Import TensorFlow with error handling
+try:
+    import tensorflow as tf
+    from tensorflow.keras.utils import img_to_array
+    tf.get_logger().setLevel('ERROR')
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    TF_AVAILABLE = True
+except ImportError:
+    st.error("TensorFlow tidak terinstall. Silakan coba lagi nanti.")
+    TF_AVAILABLE = False
 
 # ========== CONFIGURASI ==========
 st.set_page_config(
@@ -69,37 +77,6 @@ st.markdown("""
         margin: 10px 0;
     }
     
-    .button-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        justify-content: center;
-        margin: 20px 0;
-    }
-    
-    .custom-button {
-        background-color: #2E86AB;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 25px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: all 0.3s ease;
-    }
-    
-    .custom-button:hover {
-        background-color: #1A5276;
-        transform: translateY(-2px);
-    }
-    
-    .loading-spinner {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100px;
-    }
-    
     .drug-name {
         color: #2E86AB;
         font-size: 1.8rem;
@@ -115,6 +92,21 @@ st.markdown("""
         margin: 20px 0;
         text-align: center;
     }
+    
+    .stButton > button {
+        background-color: #2E86AB;
+        color: white;
+        border-radius: 10px;
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        background-color: #1A5276;
+        transform: translateY(-2px);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -127,13 +119,32 @@ GOOGLE_DRIVE_CONFIG = {
 }
 
 # ========== FUNGSI DOWNLOAD ==========
-@st.cache_data
 def download_from_gdrive(file_id, filename):
     """Download file dari Google Drive"""
     try:
-        url = f"https://drive.google.com/uc?id={file_id}"
-        gdown.download(url, filename, quiet=False)
-        return True
+        url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        
+        # Coba download dengan gdown
+        try:
+            gdown.download(url, filename, quiet=False)
+            return True
+        except Exception as e1:
+            st.warning(f"Metode pertama gagal: {e1}")
+            
+            # Alternatif download dengan requests
+            try:
+                import requests
+                response = requests.get(url, stream=True)
+                response.raise_for_status()
+                
+                with open(filename, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                return True
+            except Exception as e2:
+                st.error(f"Semua metode download gagal: {e2}")
+                return False
+                
     except Exception as e:
         st.error(f"Error downloading {filename}: {str(e)}")
         return False
@@ -142,6 +153,9 @@ def download_from_gdrive(file_id, filename):
 @st.cache_resource
 def load_model():
     """Load model TensorFlow"""
+    if not TF_AVAILABLE:
+        return None
+        
     model_path = GOOGLE_DRIVE_CONFIG["model_filename"]
     
     if not os.path.exists(model_path):
@@ -156,6 +170,7 @@ def load_model():
     
     try:
         model = tf.keras.models.load_model(model_path)
+        st.success("✅ Model berhasil dimuat!")
         return model
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
@@ -178,52 +193,73 @@ def load_data():
     
     try:
         df = pd.read_csv(dataset_path)
+        st.success("✅ Dataset berhasil dimuat!")
         return df
     except Exception as e:
         st.error(f"Error loading dataset: {str(e)}")
         return None
 
 # ========== TTS DENGAN WEB SPEECH API ==========
-def speak_text(text, key_suffix=""):
-    """Text to Speech menggunakan JavaScript"""
-    # Membersihkan teks dari karakter khusus
-    clean_text = text.replace('"', '\\"').replace("'", "\\'").replace("\n", " ")
-    
-    # Buat button untuk memicu TTS
-    if st.button(f"🔊 Dengarkan", key=f"tts_{key_suffix}"):
+def create_tts_button(text, button_text="🔊 Dengarkan", key_suffix=""):
+    """Membuat button TTS dengan JavaScript"""
+    if st.button(button_text, key=f"tts_{key_suffix}"):
+        # Bersihkan teks
+        clean_text = text.replace('"', '\\"').replace("'", "\\'").replace("\n", " ")
+        
+        # Inject JavaScript untuk TTS
         js_code = f"""
         <script>
             function speakText() {{
                 if ('speechSynthesis' in window) {{
+                    // Stop speech sebelumnya
+                    speechSynthesis.cancel();
+                    
                     const utterance = new SpeechSynthesisUtterance("{clean_text}");
                     utterance.lang = 'id-ID';
                     utterance.rate = 0.9;
                     utterance.pitch = 1;
+                    utterance.volume = 1;
+                    
                     speechSynthesis.speak(utterance);
                 }} else {{
                     alert('Browser tidak mendukung Text-to-Speech');
                 }}
             }}
+            
+            // Jalankan fungsi
             speakText();
         </script>
         """
+        
+        # Render JavaScript
         st.components.v1.html(js_code, height=0)
+        st.success("🔊 Sedang memutar audio...")
 
 # ========== MAIN APP ==========
 def main():
     # Header
     st.markdown('<h1 class="main-header">💊 ObatVision: Deteksi dan Info Obat</h1>', unsafe_allow_html=True)
     
+    # Cek ketersediaan TensorFlow
+    if not TF_AVAILABLE:
+        st.error("❌ TensorFlow tidak tersedia. Aplikasi tidak dapat berjalan.")
+        return
+    
     # Load model dan data
-    model = load_model()
-    obat_info_df = load_data()
+    with st.spinner("🔄 Memuat model dan dataset..."):
+        model = load_model()
+        obat_info_df = load_data()
     
     if model is None or obat_info_df is None:
         st.error("❌ Gagal memuat model atau dataset. Silakan refresh halaman.")
         return
     
     # Ambil class names
-    class_names = sorted(obat_info_df['label'].unique())
+    try:
+        class_names = sorted(obat_info_df['label'].unique())
+    except Exception as e:
+        st.error(f"Error mengambil class names: {e}")
+        return
     
     # ========== INPUT GAMBAR ==========
     with st.sidebar:
@@ -257,20 +293,24 @@ def main():
         
         with col1:
             # Tampilkan gambar
-            img = Image.open(img_input).convert('RGB')
-            st.image(img, caption="Gambar Input", use_column_width=True)
+            try:
+                img = Image.open(img_input).convert('RGB')
+                st.image(img, caption="Gambar Input", use_column_width=True)
+            except Exception as e:
+                st.error(f"Error memuat gambar: {e}")
+                return
         
         with col2:
             # Proses prediksi
             with st.spinner("🔍 Menganalisis gambar..."):
                 try:
                     # Preprocessing
-                    img_resized = img.resize((224, 224))  # Sesuaikan dengan input model
+                    img_resized = img.resize((224, 224))
                     img_array = img_to_array(img_resized) / 255.0
                     img_array = np.expand_dims(img_array, axis=0)
                     
                     # Prediksi
-                    prediction = model.predict(img_array)[0]
+                    prediction = model.predict(img_array, verbose=0)[0]
                     predicted_index = np.argmax(prediction)
                     predicted_label = class_names[predicted_index]
                     confidence = prediction[predicted_index] * 100
@@ -279,7 +319,7 @@ def main():
                     st.markdown(f'<div class="prediction-info">'
                               f'<h3>🎯 Hasil Prediksi</h3>'
                               f'<p><strong>{predicted_label}</strong></p>'
-                              f'<p>Akurasi: {confidence:.2f}%</p>'
+                              f'<p>Akurasi: {confidence:.1f}%</p>'
                               f'</div>', unsafe_allow_html=True)
                     
                 except Exception as e:
@@ -289,16 +329,21 @@ def main():
         # ========== INFO OBAT ==========
         try:
             # Ambil info dari CSV
-            info = obat_info_df[obat_info_df['label'] == predicted_label].iloc[0]
+            matching_rows = obat_info_df[obat_info_df['label'] == predicted_label]
+            if matching_rows.empty:
+                st.error(f"❌ Informasi untuk {predicted_label} tidak ditemukan dalam database.")
+                return
+            
+            info = matching_rows.iloc[0]
             
             # Tampilkan info obat
             st.markdown(f'<div class="info-card">'
-                       f'<h2 class="drug-name">💊 {info["nama_obat"]}</h2>'
-                       f'<p><strong>Golongan:</strong> {info["golongan"]}</p>'
-                       f'<p><strong>Jenis:</strong> {info["jenis"]}</p>'
-                       f'<p><strong>Manfaat:</strong> {info["manfaat"]}</p>'
-                       f'<p><strong>Aturan Minum:</strong> {info["aturan_minum"]}</p>'
-                       f'<p><strong>Catatan:</strong> {info["catatan"]}</p>'
+                       f'<h2 class="drug-name">💊 {info.get("nama_obat", "Tidak diketahui")}</h2>'
+                       f'<p><strong>Golongan:</strong> {info.get("golongan", "Tidak tersedia")}</p>'
+                       f'<p><strong>Jenis:</strong> {info.get("jenis", "Tidak tersedia")}</p>'
+                       f'<p><strong>Manfaat:</strong> {info.get("manfaat", "Tidak tersedia")}</p>'
+                       f'<p><strong>Aturan Minum:</strong> {info.get("aturan_minum", "Tidak tersedia")}</p>'
+                       f'<p><strong>Catatan:</strong> {info.get("catatan", "Tidak tersedia")}</p>'
                        f'</div>', unsafe_allow_html=True)
             
             # Peringatan
@@ -308,8 +353,8 @@ def main():
             st.markdown(f'<div class="warning-box">{warning_text}</div>', unsafe_allow_html=True)
             
             # TTS untuk info utama
-            main_speech = f"Obat yang terdeteksi adalah {info['nama_obat']}. {info['manfaat']}. Aturan minum: {info['aturan_minum']}. {info['catatan']}"
-            speak_text(main_speech, "main_info")
+            main_speech = f"Obat yang terdeteksi adalah {info.get('nama_obat', 'tidak diketahui')}. {info.get('manfaat', '')}. Aturan minum: {info.get('aturan_minum', '')}. {info.get('catatan', '')}"
+            create_tts_button(main_speech, "🔊 Dengarkan Info Utama", "main_info")
             
             # ========== MENU LANJUTAN ==========
             st.markdown("---")
@@ -323,10 +368,11 @@ def main():
                 if st.button("⚠️ Efek Samping", key="efek_samping"):
                     efek_samping = info.get('efek_samping', 'Informasi tidak tersedia dalam database')
                     st.markdown(f'<div class="popup-info">'
-                               f'<h4>⚠️ Efek Samping {info["nama_obat"]}</h4>'
+                               f'<h4>⚠️ Efek Samping {info.get("nama_obat", "")}</h4>'
                                f'<p>{efek_samping}</p>'
                                f'</div>', unsafe_allow_html=True)
-                    speak_text(f"Efek samping dari {info['nama_obat']}: {efek_samping}", "efek_samping")
+                    create_tts_button(f"Efek samping dari {info.get('nama_obat', '')}: {efek_samping}", 
+                                    "🔊 Dengarkan", "efek_samping")
                 
                 if st.button("🚫 Pantangan Makanan", key="pantangan"):
                     pantangan = info.get('pantangan_makanan', 'Informasi tidak tersedia dalam database')
@@ -334,7 +380,8 @@ def main():
                                f'<h4>🚫 Pantangan Makanan</h4>'
                                f'<p>{pantangan}</p>'
                                f'</div>', unsafe_allow_html=True)
-                    speak_text(f"Pantangan makanan: {pantangan}", "pantangan")
+                    create_tts_button(f"Pantangan makanan: {pantangan}", 
+                                    "🔊 Dengarkan", "pantangan")
             
             with col2:
                 if st.button("💊 Interaksi Negatif", key="interaksi"):
@@ -343,7 +390,8 @@ def main():
                                f'<h4>💊 Interaksi Negatif</h4>'
                                f'<p>{interaksi}</p>'
                                f'</div>', unsafe_allow_html=True)
-                    speak_text(f"Interaksi negatif: {interaksi}", "interaksi")
+                    create_tts_button(f"Interaksi negatif: {interaksi}", 
+                                    "🔊 Dengarkan", "interaksi")
                 
                 if st.button("❓ Jika Lupa Minum?", key="lupa_minum"):
                     lupa_minum = info.get('jika_lupa_minum', 'Segera minum jika baru ingat, kecuali sudah mendekati waktu dosis berikutnya')
@@ -351,7 +399,8 @@ def main():
                                f'<h4>❓ Jika Lupa Minum Obat</h4>'
                                f'<p>{lupa_minum}</p>'
                                f'</div>', unsafe_allow_html=True)
-                    speak_text(f"Jika lupa minum obat: {lupa_minum}", "lupa_minum")
+                    create_tts_button(f"Jika lupa minum obat: {lupa_minum}", 
+                                    "🔊 Dengarkan", "lupa_minum")
             
             with col3:
                 if st.button("🏠 Cara Penyimpanan", key="penyimpanan"):
@@ -360,11 +409,8 @@ def main():
                                f'<h4>🏠 Cara Penyimpanan</h4>'
                                f'<p>{penyimpanan}</p>'
                                f'</div>', unsafe_allow_html=True)
-                    speak_text(f"Cara penyimpanan: {penyimpanan}", "penyimpanan")
-            
-            # Session state untuk menyimpan informasi yang sudah diklik
-            if 'clicked_buttons' not in st.session_state:
-                st.session_state.clicked_buttons = []
+                    create_tts_button(f"Cara penyimpanan: {penyimpanan}", 
+                                    "🔊 Dengarkan", "penyimpanan")
             
         except Exception as e:
             st.error(f"❌ Error mengambil informasi obat: {str(e)}")
@@ -383,7 +429,7 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
-# ========== FOOTER ==========
+    # ========== FOOTER ==========
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #666; padding: 20px;">

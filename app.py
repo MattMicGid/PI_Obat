@@ -19,32 +19,10 @@ st.set_page_config(
     page_icon="💊"
 )
 
-# Konfigurasi Google Drive
-GOOGLE_DRIVE_CONFIG = {
-    "model_file_id": "1WEALsJVVZjTedzapj0ykmzVg3wf4-Yub", 
-    "dataset_file_id": "1V-HI64YbBUQmkd20IOqMzAEk88PlqECw", 
-    "model_filename": "model_obat_1.h5",
-    "dataset_filename": "dataset_obat.csv"
-}
-
-# ========== FUNGSI DOWNLOAD ==========
+# ================== LOAD MODEL ================== #
 @st.cache_resource
-def download_model():
-    """Download model dari Google Drive"""
-    model_path = GOOGLE_DRIVE_CONFIG["model_filename"]
-    
-    if not os.path.exists(model_path):
-        with st.spinner("Mengunduh model AI... Mohon tunggu sebentar."):
-            try:
-                # Gunakan format export=download dan matikan cookies
-                url = f"https://drive.google.com/uc?export=download&id={GOOGLE_DRIVE_CONFIG['model_file_id']}"
-                gdown.download(url, model_path, quiet=False, use_cookies=False)
-                st.success("Model berhasil diunduh!")
-            except Exception as e:
-                st.error(f"Gagal mengunduh model: {str(e)}")
-                return None
-    
-    # Load model
+def load_model_local():
+    model_path = "model_obat_1.h5"
     try:
         model = tf.keras.models.load_model(model_path)
         return model
@@ -52,28 +30,18 @@ def download_model():
         st.error(f"Gagal memuat model: {str(e)}")
         return None
 
+# ================== LOAD CSV ================== #
 @st.cache_data
-def download_dataset():
-    """Download dataset dari Google Drive"""
-    dataset_path = GOOGLE_DRIVE_CONFIG["dataset_filename"]
-    
-    if not os.path.exists(dataset_path):
-        with st.spinner("Mengunduh database obat..."):
-            try:
-                url = f"https://drive.google.com/uc?export=download&id={GOOGLE_DRIVE_CONFIG['dataset_file_id']}"
-                gdown.download(url, dataset_path, quiet=False, use_cookies=False)
-                st.success("Database berhasil diunduh!")
-            except Exception as e:
-                st.error(f"Gagal mengunduh database: {str(e)}")
-                return None
-    
-    # Load dataset
+def load_dataset_local():
     try:
-        df = pd.read_csv(dataset_path)
+        df = pd.read_csv("dataset_obat.csv")
         return df
     except Exception as e:
-        st.error(f"Gagal memuat database: {str(e)}")
+        st.error(f"Gagal memuat dataset: {str(e)}")
         return None
+
+model = load_model_local()
+obat_info_df = load_dataset_local()
 
 # ========== FUNGSI TTS ==========
 def speak_text(text, lang='id'):

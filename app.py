@@ -41,7 +41,7 @@ def download_from_gdrive(file_id, destination):
 def load_model():
     model_path = GOOGLE_DRIVE_CONFIG['model_filename']
     if not os.path.exists(model_path):
-        st.info("Downloading model from Google Drive...")
+        st.info("Mengunduh model dari Google Drive...")
         download_from_gdrive(GOOGLE_DRIVE_CONFIG['model_file_id'], model_path)
     model = tf.keras.models.load_model(model_path)
     return model
@@ -50,11 +50,12 @@ def load_model():
 def load_data():
     dataset_path = GOOGLE_DRIVE_CONFIG['dataset_filename']
     if not os.path.exists(dataset_path):
-        st.info("Downloading dataset from Google Drive...")
+        st.info("Mengunduh data obat dari Google Drive...")
         download_from_gdrive(GOOGLE_DRIVE_CONFIG['dataset_file_id'], dataset_path)
     df = pd.read_csv(dataset_path)
     return df
 
+# Muat model dan data
 model = load_model()
 obat_info_df = load_data()
 class_names = sorted(obat_info_df['label'].unique())

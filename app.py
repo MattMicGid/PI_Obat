@@ -5,7 +5,6 @@ import streamlit as st
 from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
-from streamlit_extras.stylable_container import stylable_container
 import base64
 import io
 import requests
@@ -197,6 +196,9 @@ class_names = sorted(obat_info_df['label'].unique())
 
 def create_audio_html(text, lang="id-ID"):
     """Create HTML audio player using browser's speech synthesis"""
+    # Escape single quotes in text to prevent JavaScript errors
+    escaped_text = text.replace("'", "\\'").replace('"', '\\"')
+    
     html_string = f"""
     <div style="margin: 10px 0;">
         <button onclick="speakText()" style="
@@ -211,7 +213,7 @@ def create_audio_html(text, lang="id-ID"):
     </div>
     <script>
         function speakText() {{
-            const text = `{text}`;
+            const text = '{escaped_text}';
             const speech = new SpeechSynthesisUtterance(text);
             speech.lang = '{lang}';
             speech.rate = 0.8;
@@ -251,7 +253,7 @@ def create_gtts_audio(text, lang="id"):
         audio_b64 = base64.b64encode(audio_bytes).decode()
         
         html_string = f"""
-        <audio controls autoplay style="width: 100%; margin: 10px 0;">
+        <audio controls style="width: 100%; margin: 10px 0;">
             <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
             Browser Anda tidak mendukung audio.
         </audio>
@@ -319,14 +321,14 @@ if img_input:
 
     st.subheader(f"💊 {info['nama_obat']}")
     st.markdown(f"""
-    *Golongan:* {info['golongan']}  
-    *Jenis:* {info['jenis']}  
+    **Golongan:** {info['golongan']}  
+    **Jenis:** {info['jenis']}  
     
-    *Manfaat:* {info['manfaat']}  
-    *Aturan Minum:* {info['aturan_minum']}  
-    *Catatan:* {info['catatan']}  
+    **Manfaat:** {info['manfaat']}  
+    **Aturan Minum:** {info['aturan_minum']}  
+    **Catatan:** {info['catatan']}  
     
-    *🎯 Akurasi Prediksi:* {confidence:.2f}%
+    **🎯 Akurasi Prediksi:** {confidence:.2f}%
     """)
 
     # Audio untuk info utama
@@ -334,45 +336,41 @@ if img_input:
     play_audio(main_text)
 
     # Peringatan
-    st.warning("⚠ Aturan minum dapat berbeda-beda pada setiap orang. Ikuti saran dokter yang memahami kondisi Anda.")
+    st.warning("⚠️ Aturan minum dapat berbeda-beda pada setiap orang. Ikuti saran dokter yang memahami kondisi Anda.")
 
     # ========== MENU LANJUTAN ==========
-    with stylable_container("popup-menu", css="""
-        button {
-            background-color: #f5f5f5;
-            border: 1px solid #ccc;
-            margin: 0.2rem 0;
-        }
-    """):
-        st.markdown("📂 Lihat lebih lanjut:")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Efek Samping"):
-                efek_samping = info.get('efek_samping', 'Tidak tersedia')
-                st.info(f"Efek samping dari {info['nama_obat']}: {efek_samping}")
-                play_audio(f"Efek samping: {efek_samping}")
-                
-            if st.button("Pantangan Makanan"):
-                pantangan = info.get('pantangan_makanan', 'Tidak tersedia')
-                st.info(pantangan)
-                play_audio(f"Pantangan makanan: {pantangan}")
-                
-            if st.button("Interaksi Negatif"):
-                interaksi = info.get('interaksi_negatif', 'Tidak tersedia')
-                st.info(interaksi)
-                play_audio(f"Interaksi negatif: {interaksi}")
-                
-        with col2:
-            if st.button("Jika Lupa Minum?"):
-                lupa_minum = info.get('jika_lupa_minum', 'Tidak tersedia')
-                st.info(lupa_minum)
-                play_audio(f"Jika lupa minum: {lupa_minum}")
-                
-            if st.button("Cara Penyimpanan"):
-                penyimpanan = info.get('penyimpanan', 'Tidak tersedia')
-                st.info(penyimpanan)
-                play_audio(f"Cara penyimpanan: {penyimpanan}")
-                
+    st.markdown("---")
+    st.markdown("### 📂 Informasi Tambahan")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📋 Efek Samping"):
+            efek_samping = info.get('efek_samping', 'Tidak tersedia')
+            st.info(f"**Efek samping dari {info['nama_obat']}:**\n{efek_samping}")
+            play_audio(f"Efek samping: {efek_samping}")
+            
+        if st.button("🚫 Pantangan Makanan"):
+            pantangan = info.get('pantangan_makanan', 'Tidak tersedia')
+            st.info(f"**Pantangan makanan:**\n{pantangan}")
+            play_audio(f"Pantangan makanan: {pantangan}")
+            
+        if st.button("⚠️ Interaksi Negatif"):
+            interaksi = info.get('interaksi_negatif', 'Tidak tersedia')
+            st.info(f"**Interaksi negatif:**\n{interaksi}")
+            play_audio(f"Interaksi negatif: {interaksi}")
+            
+    with col2:
+        if st.button("🤔 Jika Lupa Minum?"):
+            lupa_minum = info.get('jika_lupa_minum', 'Tidak tersedia')
+            st.info(f"**Jika lupa minum obat:**\n{lupa_minum}")
+            play_audio(f"Jika lupa minum: {lupa_minum}")
+            
+        if st.button("📦 Cara Penyimpanan"):
+            penyimpanan = info.get('penyimpanan', 'Tidak tersedia')
+            st.info(f"**Cara penyimpanan:**\n{penyimpanan}")
+            play_audio(f"Cara penyimpanan: {penyimpanan}")
+            
 else:
     st.info("Silakan unggah gambar obat atau ambil foto menggunakan kamera.")
 
@@ -385,7 +383,6 @@ tensorflow
 pillow
 pandas
 numpy
-streamlit-extras
 gtts
 gdown
 requests
@@ -398,3 +395,6 @@ st.sidebar.markdown("""
 3. Copy file ID dari URL Google Drive
 4. Paste ke konfigurasi di atas
 """)
+
+st.sidebar.markdown("### ℹ️ Info")
+st.sidebar.info("Aplikasi ini menggunakan machine learning untuk mendeteksi obat berdasarkan gambar. Hasil prediksi hanya sebagai referensi, konsultasikan dengan dokter untuk keputusan medis.")

@@ -12,7 +12,7 @@ import requests
 st.set_page_config(page_title="ObatVision", layout="centered")
 st.title("💊 ObatVision: Deteksi dan Info Obat")
 
-# Google Drive Config
+# Google Drive File Config
 GOOGLE_DRIVE_CONFIG = {
     "model_file_id": "1WEALsJVVZjTedzapj0ykmzVg3wf4-Yub",
     "dataset_file_id": "1V-HI64YbBUQmkd20IOqMzAEk88PlqECw",
@@ -95,28 +95,5 @@ if img_input:
     """)
 
     st.warning("⚠ Aturan minum dapat berbeda-beda pada setiap orang. Ikuti saran dokter yang memahami kondisi Anda.")
-
-    # ========== MENU LANJUTAN ========== #
-    with stylable_container("popup-menu", css="""
-        button {
-            background-color: #f5f5f5;
-            border: 1px solid #ccc;
-            margin: 0.2rem 0;
-        }
-    """):
-        st.markdown("📂 Lihat lebih lanjut:")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Efek Samping"):
-                st.info(f"Efek samping dari {info['nama_obat']}: {info.get('efek_samping', 'Tidak tersedia')}")
-            if st.button("Pantangan Makanan"):
-                st.info(info.get('pantangan_makanan', 'Tidak tersedia'))
-            if st.button("Interaksi Negatif"):
-                st.info(info.get('interaksi_negatif', 'Tidak tersedia'))
-        with col2:
-            if st.button("Jika Lupa Minum?"):
-                st.info(info.get('jika_lupa_minum', 'Tidak tersedia'))
-            if st.button("Cara Penyimpanan"):
-                st.info(info.get('penyimpanan', 'Tidak tersedia'))
 else:
     st.info("Silakan unggah gambar obat atau ambil foto menggunakan kamera.")

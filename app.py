@@ -23,7 +23,7 @@ st.set_page_config(
 GOOGLE_DRIVE_CONFIG = {
     "model_file_id": "1WEALsJVVZjTedzapj0ykmzVg3wf4-Yub", 
     "dataset_file_id": "1V-HI64YbBUQmkd20IOqMzAEk88PlqECw", 
-    "model_filename": "modal_obat_1.h5",
+    "model_filename": "model_obat_1.h5",
     "dataset_filename": "dataset_obat.csv"
 }
 

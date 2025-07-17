@@ -36,8 +36,9 @@ def download_model():
     if not os.path.exists(model_path):
         with st.spinner("Mengunduh model AI... Mohon tunggu sebentar."):
             try:
-                url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_CONFIG['model_file_id']}"
-                gdown.download(url, model_path, quiet=False)
+                # Gunakan format export=download dan matikan cookies
+                url = f"https://drive.google.com/uc?export=download&id={GOOGLE_DRIVE_CONFIG['model_file_id']}"
+                gdown.download(url, model_path, quiet=False, use_cookies=False)
                 st.success("Model berhasil diunduh!")
             except Exception as e:
                 st.error(f"Gagal mengunduh model: {str(e)}")
@@ -59,8 +60,8 @@ def download_dataset():
     if not os.path.exists(dataset_path):
         with st.spinner("Mengunduh database obat..."):
             try:
-                url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_CONFIG['dataset_file_id']}"
-                gdown.download(url, dataset_path, quiet=False)
+                url = f"https://drive.google.com/uc?export=download&id={GOOGLE_DRIVE_CONFIG['dataset_file_id']}"
+                gdown.download(url, dataset_path, quiet=False, use_cookies=False)
                 st.success("Database berhasil diunduh!")
             except Exception as e:
                 st.error(f"Gagal mengunduh database: {str(e)}")

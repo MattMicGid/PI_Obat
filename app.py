@@ -216,7 +216,7 @@ def main():
         # ========== PERINGATAN ==========
         st.warning("""
         ⚠️ **PERINGATAN PENTING:** 
-        Aturan minum dapat berbeda-beda pada setiap orang. Harus mengikuti saran dari dokter yang sudah cek kondisi pasien. 
+        🥧 Aturan minum dapat berbeda-beda pada setiap orang. Harus mengikuti saran dari dokter yang sudah cek kondisi pasien. 
         Kira-kira solusinya mungkin bisa menambahkan fitur untuk koreksi jadwal minum obat, jika memungkinkan.
         """)
         
@@ -239,7 +239,7 @@ def main():
         st.markdown("""
         <style>
         .stButton > button {
-            background-color: #f8f9fa;
+            background-color: #417eba;
             border: 2px solid #e9ecef;
             border-radius: 8px;
             padding: 0.5rem 1rem;

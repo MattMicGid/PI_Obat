@@ -225,7 +225,7 @@ def main():
         Obat yang terdeteksi adalah {info['nama_obat']}. 
         Aturan minum: {info['aturan_minum']}. 
         Perhatian: {info['catatan']}. 
-        Peringatan: Aturan minum dapat berbeda-beda pada setiap orang, harus mengikuti saran dari dokter yang sudah cek kondisi pasien.
+        Peringatan: 🥧 Aturan minum dapat berbeda-beda pada setiap orang. Harap ikuti petunjuk dari dokter yang sudah memeriksa kondisi Anda.
         """
         
         # Auto play audio

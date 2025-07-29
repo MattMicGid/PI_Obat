@@ -18,9 +18,6 @@ st.set_page_config(
     page_icon="💊"
 )
 
-st.write(f"Versi gTTS: {gTTS.__version__}")
-
-
 # ================== LOAD MODEL ================== #
 @st.cache_resource
 def load_model_local():

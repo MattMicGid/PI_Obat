@@ -17,6 +17,12 @@ st.set_page_config(
     layout="centered",
     page_icon="💊"
 )
+st.write("📦 Versi Library:")
+st.write(f"TensorFlow version: {tf.__version__}")
+st.write(f"Streamlit version: {st.__version__}")
+st.write(f"Pandas version: {pd.__version__}")
+st.write(f"NumPy version: {np.__version__}")
+st.write(f"gTTS version: {gtts.__version__}")
 
 # ================== LOAD MODEL ================== #
 @st.cache_resource
